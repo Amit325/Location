@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/save-location", "destination": "/api/save-location.js" },
+    { "source": "/api/locations", "destination": "/api/locations.js" }
+  ]
+}
