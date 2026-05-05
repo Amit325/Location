@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tap Image to Share Location</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-1: #fff9f5;
+      --bg-2: #fde7d9;
+      --bg-3: #fcd5ce;
+      --text: #3f2d2d;
+      --muted: #735f5f;
+      --card: rgba(255, 255, 255, 0.68);
+      --ring: rgba(237, 137, 114, 0.4);
+      --ok: #1f8a50;
+      --err: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 10% 20%, var(--bg-2) 0 25%, transparent 45%),
+        radial-gradient(circle at 80% 0%, var(--bg-3) 0 30%, transparent 50%),
+        linear-gradient(140deg, var(--bg-1), #ffffff);
+      color: var(--text);
+      font-family: "Manrope", sans-serif;
+      overflow-x: hidden;
+    }
+
+    .card {
+      width: min(920px, 100%);
+      border-radius: 28px;
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 20px 80px rgba(80, 48, 45, 0.18);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+      animation: floatIn 700ms ease-out;
+    }
+
+    .panel {
+      padding: clamp(20px, 4vw, 44px);
+      display: grid;
+      align-content: center;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Playfair Display", serif;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      line-height: 1.05;
+      letter-spacing: 0.2px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .girl-wrap {
+      position: relative;
+      min-height: 380px;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: linear-gradient(180deg, #fff7f2, #ffe8dd);
+    }
+
+    .girl-image {
+      width: min(100%, 420px);
+      aspect-ratio: 4 / 5;
+      object-fit: cover;
+      border-radius: 24px;
+      cursor: pointer;
+      box-shadow: 0 18px 45px rgba(64, 37, 31, 0.26);
+      transition: transform 250ms ease, box-shadow 250ms ease;
+      outline: none;
+      border: 3px solid transparent;
+    }
+
+    .girl-image:hover,
+    .girl-image:focus-visible {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 26px 60px rgba(64, 37, 31, 0.3);
+      border-color: var(--ring);
+    }
+
+    .hint {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .status {
+      margin-top: 8px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(196, 146, 128, 0.2);
+      white-space: pre-line;
+      min-height: 64px;
+    }
+
+    .status.ok {
+      color: var(--ok);
+    }
+
+    .status.error {
+      color: var(--err);
+    }
+
+    @keyframes floatIn {
+      from {
+        transform: translateY(18px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .card {
+        grid-template-columns: 1fr;
+      }
+
+      .girl-wrap {
+        order: -1;
+        min-height: 300px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <section class="panel">
+      <h1>Tap the Image to Share Your Location</h1>
+      <p>
+        No button needed. Click the image once and your location is captured with your permission.
+        Each successful click stores your location securely in cloud storage.
+      </p>
+      <p class="hint">Works on HTTPS (Vercel deployment is HTTPS by default).</p>
+      <div id="status" class="status" aria-live="polite">Waiting for your click...</div>
+    </section>
+
+    <section class="girl-wrap">
+      <img
+        id="girlImage"
+        class="girl-image"
+        tabindex="0"
+        role="button"
+        aria-label="Click to share location"
+        src="https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=1200"
+        alt="Portrait of a smiling woman"
+      />
+    </section>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const girlImage = document.getElementById("girlImage");
+    const STORAGE_KEY = "locationCaptures";
+
+    function setStatus(message, type = "") {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`.trim();
+    }
+
+    function saveLocation(payload) {
+      const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      existing.push(payload);
+      // Keep the newest 50 records only.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(existing.slice(-50)));
+    }
+
+    async function saveLocationToServer(payload) {
+      const response = await fetch("/api/save-location", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Server save failed");
+      }
+
+      return data;
+    }
+
+    function requestLocation() {
+      if (!navigator.geolocation) {
+        setStatus("Geolocation is not supported in this browser.", "error");
+        return;
+      }
+
+      setStatus("Requesting location permission...");
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+
+          const payload = {
+            latitude: lat,
+            longitude: lon,
+            accuracyMeters: accuracy,
+            capturedAt: new Date().toISOString()
+          };
+
+          saveLocation(payload);
+
+          try {
+            await saveLocationToServer({
+              ...payload,
+              source: "image-click",
+              userAgent: navigator.userAgent,
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown"
+            });
+
+            setStatus(
+              `Location saved to cloud.\nLatitude: ${lat}\nLongitude: ${lon}\nAccuracy: ${Math.round(accuracy)}m`,
+              "ok"
+            );
+          } catch (serverError) {
+            setStatus(
+              `Location captured, but cloud save failed.\nLatitude: ${lat}\nLongitude: ${lon}\nReason: ${serverError.message}`,
+              "error"
+            );
+          }
+        },
+        (error) => {
+          const reasonByCode = {
+            1: "Permission denied.",
+            2: "Position unavailable.",
+            3: "Request timed out."
+          };
+          const reason = reasonByCode[error.code] || "Unable to fetch location.";
+          setStatus(`Location not saved. ${reason}`, "error");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    girlImage.addEventListener("click", requestLocation);
+    girlImage.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        requestLocation();
+      }
+    });
+  </script>
+</body>
+</html>
